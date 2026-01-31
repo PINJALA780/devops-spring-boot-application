@@ -18,6 +18,9 @@
 
     <properties>
         <java.version>17</java.version>
+        <sonar.projectKey>devops-spring-boot-application</sonar.projectKey>
+        <sonar.projectName>devops-spring-boot-application</sonar.projectName>
+        <sonar.host.url>http://43.205.142.1:9000</sonar.host.url>
         
     </properties>
 
