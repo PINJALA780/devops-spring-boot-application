@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
       - name: springboot-container
-        image: venkatesh2007567/springbo0t-java-app:latest
+        image: venkatesh2007567/springboot-java-app:latest
         imagePullPolicy: Always
         resources:
           requests:
