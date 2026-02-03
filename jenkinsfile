@@ -1,0 +1,88 @@
+pipeline {
+	agent any
+	
+	tools {
+		maven 'maven3.9.12'
+	}
+	environment {
+		DOCKER_IMAGE = "springboot-java-app:latest"
+		DOCKER_REPO = "venkatesh2007567/springboot-java-app:latest"
+		MANIFEST_REPO = "git@github.com:PINJALA780/devops-spring-boot-application.git"
+		REPLICA_COUNT = "4"
+    }
+	stages {
+
+        stage('Checkout') {
+            steps {
+                git branch: 'main',
+                    credentialsId: 'github',
+                    url: 'https://github.com/PINJALA780/devops-spring-boot-application.git'
+            }
+        }
+		stage('Build mvn') {
+			steps {
+				sh 'mvn clean package'
+			}
+		}
+		stage('SonarQube Analysis') {
+			steps {
+				withCredentials([string(credentialsId: 'sonartoken', variable: 'SONAR_TOKEN')]) {
+					sh 'mvn sonar:sonar'
+				}
+			}
+		}
+		stage('Docker Build') {
+			steps {
+				sh 'docker build -t $DOCKER_IMAGE .'
+			}
+		}
+		stage('Trivy Image scan') {
+			steps {
+				sh 'trivy image --format sarif -o results.sarif $DOCKER_IMAGE'
+			}
+		}
+		stage('Push to Docker Hub') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'docker',
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+                    sh '''
+                    echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                    docker tag $DOCKER_IMAGE $DOCKER_REPO
+                    docker push $DOCKER_REPO
+                    docker logout
+                    '''
+				}
+			}
+		}
+		stage('Update Kubernetes Manifests') {
+			steps {
+				dir('manifests') {
+
+					git branch: 'main',
+						credentialsId: 'github-ssh',
+						url: "${MANIFEST_REPO}"
+					
+
+					sh '''
+					cd k8s
+					sed -i "s/replicas:.*/replicas: ${REPLICA_COUNT}/" deployment.yml
+					git config user.email "venkat@gmail.com"
+					git config user.name "jenkins"
+
+					git add deployment.yml
+					if git diff --staged --quiet; then
+						echo "Replicas already set to ${REPLICA_COUNT}"
+					else
+						git commit -m "Updated replicas to ${REPLICA_COUNT}"
+						git push origin main
+					fi
+					'''
+				}
+			}
+		}
+	}
+}
+
